@@ -1,0 +1,66 @@
+name: Build Windows Codename Plex ISO
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-iso:
+    runs-on: windows-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install Windows ADK Deployment Tools
+        run: |
+          choco install windows-adk --package-parameters "/features OptionId.DeploymentTools" -y
+          choco install windows-adk-winpe --package-parameters "/features OptionId.WindowsPreinstallationEnvironment" -y
+
+      - name: Run UUP download + conversion
+        shell: cmd
+        run: |
+          cd uup_package
+          call uup_download_windows.cmd
+
+      - name: Locate converted ISO
+        shell: pwsh
+        run: |
+          $iso = Get-ChildItem -Path uup_package -Filter *.iso -Recurse | Select-Object -First 1
+          if (-not $iso) { throw "No ISO found after UUP conversion" }
+          Copy-Item $iso.FullName "$PWD\base.iso"
+
+      - name: Mount and extract ISO contents
+        shell: pwsh
+        run: |
+          $mount = Mount-DiskImage -ImagePath "$PWD\base.iso" -PassThru
+          Start-Sleep -Seconds 5
+          $drive = ($mount | Get-Volume).DriveLetter
+          New-Item -ItemType Directory -Path C:\iso_src -Force
+          Copy-Item -Path "${drive}:\*" -Destination C:\iso_src -Recurse -Force
+          Dismount-DiskImage -ImagePath "$PWD\base.iso"
+          Get-ChildItem -Path C:\iso_src -Recurse | ForEach-Object { $_.Attributes = 'Normal' }
+
+      - name: Customize install.wim (branding)
+        shell: pwsh
+        run: .\scripts\customize-wim.ps1
+
+      - name: Drop in unattend / autounattend
+        shell: pwsh
+        run: Copy-Item .\customizations\unattend.xml C:\iso_src\autounattend.xml -Force
+
+      - name: Build final ISO with oscdimg
+        shell: pwsh
+        run: |
+          $oscdimg = "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
+          $etfs = "C:\iso_src\boot\etfsboot.com"
+          $efi = "C:\iso_src\efi\microsoft\boot\efisys.bin"
+          & $oscdimg -m -o -u2 -udfver102 -lWIN_CODENAME_PLEX `
+            -bootdata:2`#p0,e,b$etfs`#pEF,e,b$efi `
+            C:\iso_src WindowsCodenamePlex.iso
+
+      - name: Upload ISO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-codename-plex-iso
+          path: WindowsCodenamePlex.iso
+          retention-days: 14
