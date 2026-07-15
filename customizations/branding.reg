@@ -1,0 +1,7 @@
+Windows Registry Editor Version 5.00
+
+[HKEY_LOCAL_MACHINE\OFFLINE_SOFTWARE\Microsoft\Windows NT\CurrentVersion]
+"CSDVersion"="Codename Plex Preview"
+
+[HKEY_LOCAL_MACHINE\OFFLINE_SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE]
+"WelcomeMessage"="Welcome to Windows Codename Plex — Insider Build"
