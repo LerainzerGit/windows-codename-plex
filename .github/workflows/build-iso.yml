@@ -54,9 +54,12 @@ jobs:
           $oscdimg = "C:\Program Files (x86)\Windows Kits\10\Assessment and Deployment Kit\Deployment Tools\amd64\Oscdimg\oscdimg.exe"
           $etfs = "C:\iso_src\boot\etfsboot.com"
           $efi = "C:\iso_src\efi\microsoft\boot\efisys.bin"
-          & $oscdimg -m -o -u2 -udfver102 -lWIN_CODENAME_PLEX `
-            -bootdata:2`#p0,e,b$etfs`#pEF,e,b$efi `
-            C:\iso_src WindowsCodenamePlex.iso
+
+          if (-not (Test-Path $etfs)) { throw "Missing boot file: $etfs" }
+          if (-not (Test-Path $efi)) { throw "Missing boot file: $efi" }
+
+          $bootData = "2#p0,e,b$etfs#pEF,e,b$efi"
+          & $oscdimg -m -o -u2 -udfver102 -lWIN_CODENAME_PLEX "-bootdata:$bootData" C:\iso_src WindowsCodenamePlex.iso
 
       - name: Upload ISO artifact
         uses: actions/upload-artifact@v4
